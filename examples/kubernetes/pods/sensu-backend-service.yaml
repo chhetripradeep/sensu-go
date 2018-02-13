@@ -5,7 +5,7 @@ metadata:
 spec:
   type: LoadBalancer
   selector:
-    app: sensu
+    app: sensu-backend
   ports:
     - name: api
       protocol: TCP

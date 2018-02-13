@@ -9,14 +9,42 @@ eval $(go env)
 
 cmd=${1:-"all"}
 
-RACE=""
+# Helpers
 
+cmd_name_map() {
+    local cmd=$1
+
+    case "$cmd" in
+        backend)
+            echo "sensu-backend"
+            ;;
+        agent)
+            echo "sensu-agent"
+            ;;
+        cli)
+            echo "sensuctl"
+            ;;
+    esac
+}
+
+prompt_confirm() {
+    read -r -n 1 -p "${1} [y/N] " response
+    case "$response" in
+        [yY][eE][sS]|[yY])
+            true
+            ;;
+        *)
+            false
+            ;;
+    esac
+}
+
+RACE=""
 set_race_flag() {
     if [ "$GOARCH" == "amd64" ]; then
         RACE="-race"
     fi
 }
-
 case "$GOOS" in
     darwin)
         set_race_flag
@@ -31,6 +59,8 @@ case "$GOOS" in
         set_race_flag
         ;;
 esac
+
+# Dependencies
 
 install_deps () {
     echo "Installing deps..."
@@ -50,36 +80,9 @@ install_golang_dep() {
     dep ensure -v -vendor-only
 }
 
-cmd_name_map() {
-    local cmd=$1
+# Build Sensu binaries
 
-    case "$cmd" in
-        backend)
-            echo "sensu-backend"
-            ;;
-        agent)
-            echo "sensu-agent"
-            ;;
-        cli)
-            echo "sensuctl"
-            ;;
-    esac
-}
-
-build_tool_binary () {
-    local goos=$1
-    local goarch=$2
-    local cmd=$3
-    local subdir=$4
-
-    local outfile="target/${goos}-${goarch}/${subdir}/${cmd}"
-
-    GOOS=$goos GOARCH=$goarch go build -i -o $outfile ${REPO_PATH}/${subdir}/${cmd}/...
-
-    echo $outfile
-}
-
-build_binary () {
+go_build () {
     local goos=$1
     local goarch=$2
     local cmd=$3
@@ -103,6 +106,57 @@ build_binary () {
     echo $outfile
 }
 
+build_binary () {
+    local cmd=$1
+    local cmd_name=$(cmd_name_map $cmd)
+
+    if [ ! -d bin/ ]; then
+        mkdir -p bin/
+    fi
+
+    echo "Building $cmd for ${GOOS}-${GOARCH}"
+    out=$(go_build $GOOS $GOARCH $cmd $cmd_name)
+    rm -f bin/$(basename $out)
+    cp ${out} bin
+}
+
+build_binaries () {
+    echo "Running build..."
+
+    for cmd in agent backend cli; do
+        build_binary $cmd
+    done
+}
+
+# Build tools
+
+go_build_tool () {
+    local goos=$1
+    local goarch=$2
+    local cmd=$3
+    local subdir=$4
+
+    local outfile="target/${goos}-${goarch}/${subdir}/${cmd}"
+
+    GOOS=$goos GOARCH=$goarch go build -i -o $outfile ${REPO_PATH}/${subdir}/${cmd}/...
+
+    echo $outfile
+}
+
+build_tool () {
+    local cmd=$1
+    local subdir=$2
+
+    if [ ! -d bin/${subdir} ]; then
+        mkdir -p bin/${subdir}
+    fi
+
+    echo "Building $subdir/$cmd for ${GOOS}-${GOARCH}"
+    out=$(go_build_tool $GOOS $GOARCH $cmd $subdir)
+    rm -f bin/$(basename $out)
+    cp ${out} bin/${subdir}
+}
+
 build_tools () {
     echo "Running tool & plugin builds..."
 
@@ -115,40 +169,32 @@ build_tools () {
     done
 }
 
-build_tool () {
-    local cmd=$1
-    local subdir=$2
+# Testing
 
-    if [ ! -d bin/${subdir} ]; then
-        mkdir -p bin/${subdir}
-    fi
-
-    echo "Building $subdir/$cmd for ${GOOS}-${GOARCH}"
-    out=$(build_tool_binary $GOOS $GOARCH $cmd $subdir)
-    rm -f bin/$(basename $out)
-    cp ${out} bin/${subdir}
+e2e_commands () {
+    echo "Running e2e tests..."
+    go test ${REPO_PATH}/testing/e2e $@
 }
 
-build_commands () {
-    echo "Running build..."
+integration_test_commands () {
+    echo "Running integration tests..."
 
-    for cmd in agent backend cli; do
-        build_command $cmd
-    done
-}
-
-build_command () {
-    local cmd=$1
-    local cmd_name=$(cmd_name_map $cmd)
-
-    if [ ! -d bin/ ]; then
-        mkdir -p bin/
+    go test -timeout=180s -tags=integration $RACE $(go list ./... | egrep -v '(testing|vendor|scripts)')
+    if [ $? -ne 0 ]; then
+        echo "Integration testing failed..."
+        exit 1
     fi
 
-    echo "Building $cmd for ${GOOS}-${GOARCH}"
-    out=$(build_binary $GOOS $GOARCH $cmd $cmd_name)
-    rm -f bin/$(basename $out)
-    cp ${out} bin
+    # If the race detector was enabled, do a second pass without it
+    if [ ! -z "$RACE" ]; then
+        echo "Running integration tests without race detector..."
+
+        go test -timeout=180s -tags=integration $(go list ./... | egrep -v '(testing|vendor|scripts)')
+        if [ $? -ne 0 ]; then
+            echo "Integration testing failed..."
+            exit 1
+        fi
+    fi
 }
 
 linter_commands () {
@@ -177,77 +223,18 @@ unit_test_commands () {
     fi
 }
 
-integration_test_commands () {
-    echo "Running integration tests..."
+# Dashboard
 
-    go test -timeout=180s -tags=integration $RACE $(go list ./... | egrep -v '(testing|vendor|scripts)')
-    if [ $? -ne 0 ]; then
-        echo "Integration testing failed..."
-        exit 1
-    fi
-
-    # If the race detector was enabled, do a second pass without it
-    if [ ! -z "$RACE" ]; then
-        echo "Running integration tests without race detector..."
-
-        go test -timeout=180s -tags=integration $(go list ./... | egrep -v '(testing|vendor|scripts)')
-        if [ $? -ne 0 ]; then
-            echo "Integration testing failed..."
-            exit 1
-        fi
-    fi
+build_dashboard() {
+    pushd "${DASHBOARD_PATH}"
+    yarn install
+    yarn precompile
+    yarn build
+    popd
 }
 
-e2e_commands () {
-    echo "Running e2e tests..."
-    go test ${REPO_PATH}/testing/e2e $@
-}
-
-docker_commands () {
-    # make this one var (push or release - master or versioned)
-    local push=$1
-    local release=$2
-    local build_sha=$(git rev-parse HEAD)
-
-    for cmd in cat false sleep true; do
-        echo "Building tools/$cmd for linux-amd64"
-        build_tool_binary linux amd64 $cmd "tools"
-    done
-
-    for cmd in slack; do
-        echo "Building handlers/$cmd for linux-amd64"
-        build_tool_binary linux amd64 $cmd "handlers"
-    done
-
-    # install_dashboard_deps
-    # build_dashboard
-    # bundle_static_assets
-
-    for cmd in agent backend cli; do
-        echo "Building $cmd for linux-amd64"
-        local cmd_name=$(cmd_name_map $cmd)
-        build_binary linux amd64 $cmd $cmd_name
-    done
-
-    docker build --label build.sha=${build_sha} -t sensuapp/sensu-go:master .
-
-    # push master - tags and pushes latest master docker build only
-    if [ "$push" == "push" ] && [ "$release" == "master" ]; then
-        docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD"
-        docker push sensuapp/sensu-go:master
-        # push versioned - tags and pushes with version pulled from
-        # version/prerelease/iteration files
-    elif [ "$push" == "push" ] && [ "$release" == "versioned" ]; then
-        docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD"
-        local version_alpha=$(echo sensuapp/sensu-go:$(cat version/version.txt)-alpha)
-        local version_alpha_iteration=$(echo sensuapp/sensu-go:$(cat version/version.txt)-$(cat version/prerelease.txt).$(cat version/iteration.txt))
-        docker tag sensuapp/sensu-go:master sensuapp/sensu-go:latest
-        docker push sensuapp/sensu-go:latest
-        docker tag sensuapp/sensu-go:master $version_alpha_iteration
-        docker push $version_alpha_iteration
-        docker tag $version_alpha_iteration $version_alpha
-        docker push $version_alpha
-    fi
+bundle_static_assets() {
+    fileb0x ./.b0x.yaml
 }
 
 check_for_presence_of_yarn() {
@@ -279,29 +266,7 @@ test_dashboard() {
     popd
 }
 
-build_dashboard() {
-    pushd "${DASHBOARD_PATH}"
-    yarn install
-    yarn precompile
-    yarn build
-    popd
-}
-
-bundle_static_assets() {
-    fileb0x ./.b0x.yaml
-}
-
-prompt_confirm() {
-    read -r -n 1 -p "${1} [y/N] " response
-    case "$response" in
-        [yY][eE][sS]|[yY])
-            true
-            ;;
-        *)
-            false
-            ;;
-    esac
-}
+# Deployment
 
 deploy() {
     echo "Deploying..."
@@ -314,7 +279,7 @@ deploy() {
     # Deploy system packages to PackageCloud
     gem install package_cloud
     make clean
-    docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD"
+    docker_hub_login
     docker pull sensuapp/sensu-go-build
     docker run -it -v `pwd`:/go/src/github.com/sensu/sensu-go sensuapp/sensu-go-build
     docker run -it -v `pwd`:/go/src/github.com/sensu/sensu-go -e PACKAGECLOUD_TOKEN="$PACKAGECLOUD_TOKEN" sensuapp/sensu-go-build publish_travis
@@ -323,14 +288,61 @@ deploy() {
     docker_commands push versioned
 }
 
+# Docker Images
+
+docker_build () {
+    local build_sha=$(git rev-parse HEAD)
+
+    # Build Sensu binaries and tools
+    build_binaries
+    build_tools
+
+    # Build the image using the "master" tag
+    docker build --label build.sha=${build_sha} -t sensuapp/sensu-go:master .
+}
+
+docker_hub_login() {
+    docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD"
+}
+
+docker_hub_push () {
+    # Type of release (master or versioned)
+    local release=$1
+
+    docker_hub_login
+
+    if [ "$release" == "master" ]; then
+        # push master - tags and pushes latest master docker build only
+        docker push sensuapp/sensu-go:master
+    elif [ "$release" == "versioned" ]; then
+        # push versioned - tags and pushes with version pulled from
+        # version/prerelease/iteration files
+        local version_alpha=$(echo sensuapp/sensu-go:$(cat version/version.txt)-alpha)
+        local version_alpha_iteration=$(echo sensuapp/sensu-go:$(cat version/version.txt)-$(cat version/prerelease.txt).$(cat version/iteration.txt))
+        docker tag sensuapp/sensu-go:master sensuapp/sensu-go:latest
+        docker push sensuapp/sensu-go:latest
+        docker tag sensuapp/sensu-go:master $version_alpha_iteration
+        docker push $version_alpha_iteration
+        docker tag $version_alpha_iteration $version_alpha
+        docker push $version_alpha
+    else
+        echo "No type of Docker release specified"
+    fi
+}
+
+deploy_docker () {
+    docker_build
+    docker_hub_push "${@:2}"
+}
+
 if [ "$cmd" == "build" ]; then
-    build_commands
+    build_binaries
 elif [ "$cmd" == "build_agent" ]; then
-    build_command agent
+    build_binary agent
 elif [ "$cmd" == "build_backend" ]; then
-    build_command backend
+    build_binary backend
 elif [ "$cmd" == "build_cli" ]; then
-    build_command cli
+    build_binary cli
 elif [ "$cmd" == "build_dashboard" ]; then
     install_dashboard_deps
     build_dashboard
@@ -350,13 +362,13 @@ elif [ "$cmd" == "deploy" ]; then
         prompt_confirm "You are trying to deploy outside of Travis. Are you sure?" || exit 0
     fi
     deploy
+elif [ "$cmd" == "deploy_docker" ]; then
+    deploy_docker "${@:2}"
 elif [ "$cmd" == "deps" ]; then
     install_deps
-elif [ "$cmd" == "docker" ]; then
-    docker_commands "${@:2}"
 elif [ "$cmd" == "e2e" ]; then
     # Accepts specific test name. E.g.: ./build.sh e2e -run TestAgentKeepalives
-    build_commands
+    build_binaries
     e2e_commands "${@:2}"
 elif [ "$cmd" == "lint" ]; then
     linter_commands
@@ -375,6 +387,6 @@ else
     build_tools
     unit_test_commands
     integration_test_commands
-    build_commands
+    build_binaries
     e2e_commands
 fi

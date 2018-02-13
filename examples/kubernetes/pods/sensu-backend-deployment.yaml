@@ -3,13 +3,22 @@ kind: Deployment
 metadata:
   name: sensu-backend
 spec:
-  replicas: 1
+  replicas: 3
   template:
     metadata:
-      name: sensu-backend
       labels:
-        app: sensu
+        app: sensu-backend
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - sensu-backend
+            topologyKey: "kubernetes.io/hostname"
       containers:
         - name: sensu-backend
           image: gcr.io/engineering-182923/sensu-go
