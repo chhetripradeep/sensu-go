@@ -13,7 +13,6 @@ import (
 )
 
 const timeWindow = `{"days":{"all":[{"begin":"12:00 AM","end":"11:59 PM"},{"begin":"11:00 PM","end":"1:00 AM"}]}}`
-const timeWindowSmall = `{"days":{"all":[{"begin":"11:58 PM","end":"11:59 PM"}]}}`
 
 func TestCheckSubdue(t *testing.T) {
 	t.Parallel()
@@ -83,6 +82,7 @@ func createCheck(t *testing.T, ctl *sensuCtl) {
 		"--publish",
 		"--interval", "1",
 		"--subscriptions", "test",
+		"--command", "true",
 	)
 	require.NoError(t, err, string(out))
 }
@@ -130,6 +130,6 @@ func subdueCheck(t *testing.T, ctl *sensuCtl, data string) {
 	defer func() {
 		ctl.SetStdin(os.Stdin)
 	}()
-	_, err := ctl.run("check", "subdue", "mycheck")
+	_, err := ctl.run("check", "set-subdue", "mycheck")
 	require.NoError(t, err)
 }

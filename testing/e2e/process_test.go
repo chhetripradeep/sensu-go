@@ -119,13 +119,13 @@ func (b *backendProcess) Start() error {
 		"--api-port", strconv.FormatInt(int64(b.APIPort), 10),
 		"--dashboard-host", b.DashboardHost,
 		"--dashboard-port", strconv.FormatInt(int64(b.DashboardPort), 10),
-		"--store-client-url", b.EtcdClientURL,
-		"--store-peer-url", b.EtcdPeerURL,
-		"--store-initial-cluster", b.EtcdInitialCluster,
-		"--store-initial-cluster-state", b.EtcdInitialClusterState,
-		"--store-node-name", b.EtcdName,
-		"--store-initial-advertise-peer-url", b.EtcdPeerURL,
-		"--store-initial-cluster-token", b.EtcdInitialClusterToken,
+		"--listen-client-urls", b.EtcdClientURL,
+		"--listen-peer-urls", b.EtcdPeerURL,
+		"--initial-cluster", b.EtcdInitialCluster,
+		"--initial-cluster-state", b.EtcdInitialClusterState,
+		"--name", b.EtcdName,
+		"--initial-advertise-peer-urls", b.EtcdPeerURL,
+		"--initial-cluster-token", b.EtcdInitialClusterToken,
 	)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -348,11 +348,8 @@ func (s *sensuCtl) run(args ...string) ([]byte, error) {
 	cmd := exec.Command(sensuctlPath, args...)
 	cmd.Stdin = s.stdin
 	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return out, err
-	}
 
-	return out, nil
+	return out, err
 }
 
 func (s *sensuCtl) SetStdin(r io.Reader) {

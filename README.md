@@ -1,6 +1,6 @@
 # Sensu 2.0
 
-[![Build Status](https://travis-ci.com/sensu/sensu-go.svg?token=bQ4K7jzHALx4myyBoqcu&branch=master)](https://travis-ci.com/sensu/sensu-go)
+[![Build Status](https://travis-ci.com/sensu/sensu-go.svg?branch=master)](https://travis-ci.com/sensu/sensu-go)
 
 ## Contributing/Development
 
@@ -15,7 +15,7 @@ information on the DCO, please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Overview
 
-We are using the version **proto3** of the protocol buffers language. Here's some useful ressources:
+We are using the version **proto3** of the protocol buffers language. Here are some useful resources:
 
 [To learn more about protocol buffers](https://developers.google.com/protocol-buffers/docs/overview)
 
@@ -32,11 +32,11 @@ Otherwise, see the **for non-C++ users** [instructions here.](https://github.com
 
 ### Quick Start
 
-Once you make a change to any `*.proto` file within the **types** package, you will need regenerate the associated `*.pb.go` file. To do so, simply run the [genproto.sh](https://github.com/sensu/sensu-go/blob/master/scripts/genproto.sh) script, which will install all required dependencies and launch the code generation.
+Once you make a change to any `*.proto` file within the **types** package, you will need to regenerate the associated `*.pb.go` file. To do so, simply run the [genproto.sh](https://github.com/sensu/sensu-go/blob/master/scripts/genproto.sh) script, which will install all required dependencies and launch the code generation (be sure to run the below `./build.sh deps` first though).
 
 ## Dependencies
 
-Sensu uses [golang/dep](https://github.com/golang/dep) for managing it's
+Sensu uses [golang/dep](https://github.com/golang/dep) for managing its
 dependencies.
 
 ### Usage

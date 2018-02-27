@@ -54,7 +54,7 @@ function build_tool_binary([string]$goos, [string]$goarch, [string]$bin, [string
     $outfile = "target/$goos-$goarch/$subdir/$bin.exe"
     $env:GOOS = $goos
     $env:GOARCH = $goarch
-    go build -i -o $outfile "$REPO_PATH/$subdir/$bin/..."
+    go build -o $outfile "$REPO_PATH/$subdir/$bin/..."
     If ($LASTEXITCODE -ne 0) {
         echo "Failed to build $outfile..."
         exit 1
@@ -96,7 +96,7 @@ function build_binary([string]$goos, [string]$goarch, [string]$bin, [string]$cmd
     $ldflags = $ldflags + " -X $version_pkg.BuildDate=$build_date"
     $ldflags = $ldflags + " -X $version_pkg.BuildSHA=$build_sha"
 
-    go build -ldflags "$ldflags" -i -o $outfile "$REPO_PATH/$bin/cmd/..."
+    go build -ldflags "$ldflags" -o $outfile "$REPO_PATH/$bin/cmd/..."
     If ($LASTEXITCODE -ne 0) {
         echo "Failed to build $outfile..."
         exit 1
@@ -165,7 +165,7 @@ function linter_commands
         exit 1
     }
 
-    errcheck $(go list ./... | Select-String -pattern "dashboardd", "cli/commands/importer", "agent/assetmanager", "scripts" -notMatch)
+    errcheck $(go list ./... | Select-String -pattern "dashboardd", "agent/assetmanager", "scripts" -notMatch)
     If ($LASTEXITCODE -ne 0) {
         echo "Linting failed..."
         exit 1
@@ -205,6 +205,61 @@ function e2e_commands
     }
 }
 
+function wait_for_appveyor_jobs {
+    if ($env:APPVEYOR_JOB_NUMBER -ne 1) { return }
+
+    write-host "Waiting for other jobs to complete"
+
+    $headers = @{
+        "Authorization" = "Bearer $env:APPVEYOR_API_TOKEN"
+        "Content-type" = "application/json"
+    }
+
+    [datetime]$stop = ([datetime]::Now).AddMinutes($env:TIME_OUT_MINS)
+    [bool]$success = $false
+
+    while(!$success -and ([datetime]::Now) -lt $stop) {
+        $project = Invoke-RestMethod -Uri "https://ci.appveyor.com/api/projects/$env:APPVEYOR_ACCOUNT_NAME/$env:APPVEYOR_PROJECT_SLUG" -Headers $headers -Method GET
+        $success = $true
+        $project.build.jobs | foreach-object {if (($_.jobId -ne $env:APPVEYOR_JOB_ID) -and ($_.status -ne "success")) {$success = $false}; $_.jobId; $_.status}
+        if (!$success) {Start-sleep 5}
+    }
+
+    if (!$success) {throw "Test jobs were not finished in $env:TIME_OUT_MINS minutes"}
+}
+
+function build_package([string]$package, [string]$arch)
+{
+    echo "Building $package MSI"
+
+    rm *.wixobj
+    rm *.wixpdb
+
+    $package_base_name = "sensu-$package"
+    If ($package -eq "cli") {
+        $package_base_name = "sensuctl"
+    }
+
+    $version = ($appveyor_repo_tag_name -split '.*(\d+\.\d+\.\d+).*')[1]
+    $iteration = ($appveyor_repo_tag_name -split '.*-(\d+)$')[1]
+    $full_version = "${version}.${iteration}"
+    $msi_filename = "${package_base_name}_${full_version}_${arch}.msi"
+
+    echo "Package version: $version"
+    echo "Package iteration: $iteration"
+    echo "Package full version: $full_version"
+
+    echo "Wix path: $Env:WIX"
+    $Env:Path += ";$($Env:WIX)\\bin"
+
+    candle.exe -arch $arch packaging/wix/$package/*.wxs -ext WixUtilExtension -dProjectDir="${PWD}" -dVersionNumber="${full_version}"
+    light.exe -nologo -dcl:high -ext WixUIExtension -ext WixUtilExtension -ext WixNetFxExtension *.wixobj -cultures:en-us -loc packaging/wix/$package/Product_en-us.wxl -o $msi_filename
+
+    ls
+
+    Push-AppveyorArtifact $msi_filename
+}
+
 If ($cmd -eq "build") {
     build_commands
 }
@@ -242,6 +297,20 @@ ElseIf ($cmd -eq "unit") {
 }
 ElseIf ($cmd -eq "integration") {
     integration_test_commands
+}
+ElseIf ($cmd -eq "wait_for_appveyor_jobs") {
+    If (($env:APPVEYOR_REPO_TAG -eq $true) -and ($env:MSI_BUILDER -eq $true)) {
+        $env:GOARCH = "amd64"
+        build_command "agent"
+
+        $env:GOARCH = "386"
+        build_command "agent"
+
+        wait_for_appveyor_jobs
+
+        build_package "agent" "x64"
+        build_package "agent" "x86"
+    }
 }
 Else {
     install_deps

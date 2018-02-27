@@ -1,6 +1,7 @@
 package agentd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,7 +13,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/sensu/sensu-go/backend/apid/middlewares"
 	"github.com/sensu/sensu-go/backend/messaging"
-	"github.com/sensu/sensu-go/backend/store"
 	"github.com/sensu/sensu-go/transport"
 	"github.com/sensu/sensu-go/types"
 )
@@ -23,6 +23,12 @@ var (
 	upgrader = &websocket.Upgrader{}
 )
 
+// Store specifies storage requirements for Agentd.
+type Store interface {
+	middlewares.AuthStore
+	SessionStore
+}
+
 // Agentd is the backend HTTP API.
 type Agentd struct {
 	stopping   chan struct{}
@@ -31,7 +37,7 @@ type Agentd struct {
 	errChan    chan error
 	httpServer *http.Server
 
-	Store      store.Store
+	Store      Store
 	Host       string
 	Port       int
 	MessageBus messaging.MessageBus
@@ -49,8 +55,6 @@ func (a *Agentd) Start() error {
 	a.wg = &sync.WaitGroup{}
 
 	a.errChan = make(chan error, 1)
-
-	// handler := http.HandlerFunc(a.webSocketHandler)
 
 	// TODO: add JWT authentication support
 	handler := middlewares.BasicAuthentication(http.HandlerFunc(a.webSocketHandler), a.Store)
@@ -83,7 +87,7 @@ func (a *Agentd) Start() error {
 
 // Stop Agentd.
 func (a *Agentd) Stop() error {
-	if err := a.httpServer.Shutdown(nil); err != nil {
+	if err := a.httpServer.Shutdown(context.TODO()); err != nil {
 		// failure/timeout shutting down the server gracefully
 		logger.Error("failed to shutdown http server gracefully - forcing shutdown")
 		if closeErr := a.httpServer.Close(); closeErr != nil {

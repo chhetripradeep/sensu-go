@@ -2,6 +2,7 @@ package agentd
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/sensu/sensu-go/backend/messaging"
@@ -20,16 +21,20 @@ type testTransport struct {
 	recvErr error
 }
 
-func (t testTransport) Closed() bool {
+func (t *testTransport) Closed() bool {
 	return t.closed
 }
 
-func (t testTransport) Close() error {
+func (t *testTransport) Close() error {
 	t.closed = true
 	return nil
 }
 
-func (t testTransport) Send(msg *transport.Message) error {
+func (t *testTransport) Reconnect(wsServerURL string, tlsOpts *types.TLSOptions, requestHeader http.Header) error {
+	return nil
+}
+
+func (t *testTransport) Send(msg *transport.Message) error {
 	if t.sendErr != nil {
 		return t.sendErr
 	}
@@ -37,7 +42,7 @@ func (t testTransport) Send(msg *transport.Message) error {
 	return nil
 }
 
-func (t testTransport) Receive() (*transport.Message, error) {
+func (t *testTransport) Receive() (*transport.Message, error) {
 	if t.recvErr != nil {
 		return nil, t.recvErr
 	}
@@ -45,7 +50,7 @@ func (t testTransport) Receive() (*transport.Message, error) {
 }
 
 func TestGoodSessionConfig(t *testing.T) {
-	conn := testTransport{
+	conn := &testTransport{
 		sendCh: make(chan *transport.Message, 10),
 	}
 
@@ -72,7 +77,7 @@ func TestGoodSessionConfig(t *testing.T) {
 }
 
 func TestBadSessionConfig(t *testing.T) {
-	conn := testTransport{
+	conn := &testTransport{
 		sendCh: make(chan *transport.Message, 10),
 	}
 

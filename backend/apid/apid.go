@@ -1,6 +1,8 @@
 package apid
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/sensu/sensu-go/backend/apid/actions"
 	"github.com/sensu/sensu-go/backend/apid/middlewares"
 	"github.com/sensu/sensu-go/backend/apid/routers"
 	"github.com/sensu/sensu-go/backend/messaging"
@@ -39,6 +42,14 @@ type APId struct {
 	TLS           *types.TLSOptions
 }
 
+func notFoundHandler(w http.ResponseWriter, req *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+	resp := map[string]interface{}{
+		"error": "not found", "code": actions.NotFound,
+	}
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
 // Start Apid.
 func (a *APId) Start() error {
 	if a.Store == nil {
@@ -55,7 +66,8 @@ func (a *APId) Start() error {
 
 	a.errChan = make(chan error, 1)
 
-	router := mux.NewRouter()
+	router := mux.NewRouter().UseEncodedPath()
+	router.NotFoundHandler = http.HandlerFunc(notFoundHandler)
 	registerUnauthenticatedResources(router, a.BackendStatus)
 	registerAuthenticationResources(router, a.Store)
 	registerRestrictedResources(router, a.Store, a.MessageBus)
@@ -90,7 +102,7 @@ func (a *APId) Start() error {
 
 // Stop httpApi.
 func (a *APId) Stop() error {
-	if err := a.httpServer.Shutdown(nil); err != nil {
+	if err := a.httpServer.Shutdown(context.TODO()); err != nil {
 		// failure/timeout shutting down the server gracefully
 		logger.Error("failed to shutdown http server gracefully - forcing shutdown")
 		if closeErr := a.httpServer.Close(); closeErr != nil {

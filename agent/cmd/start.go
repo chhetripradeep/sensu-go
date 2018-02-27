@@ -14,6 +14,7 @@ import (
 	"github.com/sensu/sensu-go/agent"
 	"github.com/sensu/sensu-go/types/dynamic"
 	"github.com/sensu/sensu-go/util/path"
+	"github.com/sensu/sensu-go/util/url"
 	"github.com/sensu/sensu-go/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -25,6 +26,10 @@ var (
 )
 
 const (
+	// DefaultBackendPort specifies the default port to use when a port is not
+	// specified in backend urls
+	DefaultBackendPort = "8081"
+
 	flagAgentID               = "id"
 	flagAPIHost               = "api-host"
 	flagAPIPort               = "api-port"
@@ -101,7 +106,6 @@ func newStartCommand() *cobra.Command {
 			cfg := agent.NewConfig()
 			cfg.API.Host = viper.GetString(flagAPIHost)
 			cfg.API.Port = viper.GetInt(flagAPIPort)
-			cfg.BackendURLs = viper.GetStringSlice(flagBackendURL)
 			cfg.CacheDir = viper.GetString(flagCacheDir)
 			cfg.Deregister = viper.GetBool(flagDeregister)
 			cfg.DeregistrationHandler = viper.GetString(flagDeregistrationHandler)
@@ -118,6 +122,14 @@ func newStartCommand() *cobra.Command {
 			agentID := viper.GetString(flagAgentID)
 			if agentID != "" {
 				cfg.AgentID = agentID
+			}
+
+			for _, backendURL := range viper.GetStringSlice(flagBackendURL) {
+				newURL, err := url.AppendPortIfMissing(backendURL, DefaultBackendPort)
+				if err != nil {
+					return err
+				}
+				cfg.BackendURLs = append(cfg.BackendURLs, newURL)
 			}
 
 			// Get a single or a list of redact fields
@@ -179,23 +191,23 @@ func newStartCommand() *cobra.Command {
 	viper.SetConfigFile(configFilePath)
 
 	// Flag defaults
-	viper.SetDefault(flagAgentID, "")
-	viper.SetDefault(flagAPIHost, "127.0.0.1")
-	viper.SetDefault(flagAPIPort, 3031)
-	viper.SetDefault(flagBackendURL, []string{"ws://127.0.0.1:8081"})
+	viper.SetDefault(flagAgentID, agent.GetDefaultAgentID())
+	viper.SetDefault(flagAPIHost, agent.DefaultAPIHost)
+	viper.SetDefault(flagAPIPort, agent.DefaultAPIPort)
+	viper.SetDefault(flagBackendURL, []string{agent.DefaultBackendURL})
 	viper.SetDefault(flagCacheDir, path.SystemCacheDir("sensu-agent"))
 	viper.SetDefault(flagDeregister, false)
 	viper.SetDefault(flagDeregistrationHandler, "")
-	viper.SetDefault(flagEnvironment, "default")
-	viper.SetDefault(flagKeepaliveInterval, 20)
-	viper.SetDefault(flagKeepaliveTimeout, 120)
-	viper.SetDefault(flagOrganization, "default")
-	viper.SetDefault(flagPassword, "P@ssw0rd!")
+	viper.SetDefault(flagEnvironment, agent.DefaultEnvironment)
+	viper.SetDefault(flagKeepaliveInterval, agent.DefaultKeepaliveInterval)
+	viper.SetDefault(flagKeepaliveTimeout, agent.DefaultKeepaliveTimeout)
+	viper.SetDefault(flagOrganization, agent.DefaultOrganization)
+	viper.SetDefault(flagPassword, agent.DefaultPassword)
 	viper.SetDefault(flagRedact, dynamic.DefaultRedactFields)
-	viper.SetDefault(flagSocketHost, "127.0.0.1")
-	viper.SetDefault(flagSocketPort, 3030)
+	viper.SetDefault(flagSocketHost, agent.DefaultSocketHost)
+	viper.SetDefault(flagSocketPort, agent.DefaultSocketPort)
 	viper.SetDefault(flagSubscriptions, []string{})
-	viper.SetDefault(flagUser, "agent")
+	viper.SetDefault(flagUser, agent.DefaultUser)
 
 	// Merge in config flag set so that it appears in command usage
 	cmd.Flags().AddFlagSet(configFlagSet)

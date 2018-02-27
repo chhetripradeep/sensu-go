@@ -11,7 +11,7 @@ import (
 func (a *Agent) getAgentEntity() *types.Entity {
 	if a.entity == nil {
 		e := &types.Entity{
-			Class:            "agent",
+			Class:            types.EntityAgentClass,
 			Deregister:       a.config.Deregister,
 			Environment:      a.config.Environment,
 			ID:               a.config.AgentID,
@@ -61,7 +61,7 @@ func (a *Agent) getEntities(event *types.Event) {
 	if event.Entity != nil && event.Entity.ID != a.config.AgentID {
 		// Identify the event's source as the provided entity so it can be properly
 		// handled by the backend
-		event.Check.Config.ProxyEntityID = event.Entity.ID
+		event.Check.ProxyEntityID = event.Entity.ID
 	}
 
 	// From this point we make sure that the agent's entity is used in the event

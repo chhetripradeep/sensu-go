@@ -68,7 +68,7 @@ install_deps () {
     go get gopkg.in/alecthomas/gometalinter.v1
     go get github.com/gordonklaus/ineffassign
     go get github.com/jgautheron/goconst/cmd/goconst
-    go get github.com/kisielk/errcheck
+    go get honnef.co/go/tools/cmd/megacheck
     go get github.com/golang/lint/golint
     go get github.com/UnnoTed/fileb0x
     install_golang_dep
@@ -101,7 +101,7 @@ go_build () {
     local ldflags+=" -X $version_pkg.BuildDate=${build_date}"
     local ldflags+=" -X $version_pkg.BuildSHA=${build_sha}"
 
-    CGO_ENABLED=0 GOOS=$goos GOARCH=$goarch go build -ldflags "${ldflags}" -i -o $outfile ${REPO_PATH}/${cmd}/cmd/...
+    CGO_ENABLED=0 GOOS=$goos GOARCH=$goarch go build -ldflags "${ldflags}" -o $outfile ${REPO_PATH}/${cmd}/cmd/...
 
     echo $outfile
 }
@@ -206,7 +206,7 @@ linter_commands () {
         exit 1
     fi
 
-    errcheck $(go list ./... | grep -v dashboardd | grep -v cli/commands/importer | grep -v agent/assetmanager | grep -v scripts)
+    megacheck $(go list ./... | grep -v dashboardd | grep -v agent/assetmanager | grep -v scripts)
     if [ $? -ne 0 ]; then
         echo "Linting failed..."
         exit 1

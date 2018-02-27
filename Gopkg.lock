@@ -39,18 +39,11 @@
   revision = "3b1fffcc45b37a2644a23eb7dc434d4d9f0987ba"
 
 [[projects]]
-  name = "github.com/cenkalti/backoff"
-  packages = ["."]
-  revision = "61153c768f31ee5f130071d08fc82b85208528de"
-  version = "v1.1.0"
-
-[[projects]]
   name = "github.com/coreos/bbolt"
   packages = ["."]
   revision = "48ea1b39c25fc1bab3506fbc712ecbaa842c4d2d"
 
 [[projects]]
-  branch = "master"
   name = "github.com/coreos/etcd"
   packages = [
     "alarm",
@@ -121,7 +114,8 @@
     "wal",
     "wal/walpb"
   ]
-  revision = "a7f1fbe00ec216fcb3a1919397a103b41dca8413"
+  revision = "28f3f26c0e303392556035b694f75768d449d33d"
+  version = "v3.3.1"
 
 [[projects]]
   name = "github.com/coreos/go-semver"
@@ -179,6 +173,12 @@
     "internal/prefix"
   ]
   revision = "f41072d47fff1112fa37146dfc812a476cce2d7f"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/dustin/go-humanize"
+  packages = ["."]
+  revision = "bb3d318650d48840a39aa21a027c6630e198e626"
 
 [[projects]]
   name = "github.com/emicklei/proto"
@@ -260,7 +260,7 @@
   name = "github.com/gorilla/mux"
   packages = ["."]
   revision = "24fca303ac6da784b9e8269f724ddeb0b2eea5e7"
-  version = "v1.5.0"
+  version = "v1.6.1"
 
 [[projects]]
   name = "github.com/gorilla/websocket"
@@ -479,8 +479,10 @@
 [[projects]]
   name = "github.com/shirou/gopsutil"
   packages = [
+    "cpu",
     "host",
     "internal/common",
+    "mem",
     "net",
     "process"
   ]
@@ -515,10 +517,9 @@
   version = "v1.1.0"
 
 [[projects]]
-  branch = "master"
   name = "github.com/spf13/cobra"
   packages = ["."]
-  revision = "b78744579491c1ceeaaa3b40205e56b0591b93a3"
+  revision = "fd32f09af19efc9b1279c54e0d8ed23f66232a15"
 
 [[projects]]
   branch = "master"
@@ -689,8 +690,8 @@
     "core",
     "terminal"
   ]
-  revision = "0aa8b6a162b391fe2d95648b7677d1d6ac2090a6"
-  version = "v1.4.1"
+  revision = "344ec26ea976135df7508f1f513e5490a4686e11"
+  version = "v1.4.0"
 
 [[projects]]
   name = "gopkg.in/h2non/filetype.v1"
@@ -711,6 +712,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d2d5c2013e1b28736e2369b4d73532e1e736e2d02bbae92b8497a663ffd67a7f"
+  inputs-digest = "4896971be68d4cc9956d44ff68d70559206444b3b855c15dfd01b73a238c72a0"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -260,14 +260,12 @@ func (k *Keepalived) startMonitorSweeper() {
 
 func createKeepaliveEvent(entity *types.Entity) *types.Event {
 	keepaliveCheck := &types.Check{
-		Config: &types.CheckConfig{
-			Name:         KeepaliveCheckName,
-			Interval:     entity.KeepaliveTimeout,
-			Handlers:     []string{KeepaliveHandlerName},
-			Environment:  entity.Environment,
-			Organization: entity.Organization,
-		},
-		Status: 1,
+		Name:         KeepaliveCheckName,
+		Interval:     entity.KeepaliveTimeout,
+		Handlers:     []string{KeepaliveHandlerName},
+		Environment:  entity.Environment,
+		Organization: entity.Organization,
+		Status:       1,
 	}
 	keepaliveEvent := &types.Event{
 		Timestamp: time.Now().Unix(),
@@ -280,14 +278,12 @@ func createKeepaliveEvent(entity *types.Entity) *types.Event {
 
 func createRegistrationEvent(entity *types.Entity) *types.Event {
 	registrationCheck := &types.Check{
-		Config: &types.CheckConfig{
-			Name:         RegistrationCheckName,
-			Interval:     entity.KeepaliveTimeout,
-			Handlers:     []string{RegistrationHandlerName},
-			Environment:  entity.Environment,
-			Organization: entity.Organization,
-		},
-		Status: 1,
+		Name:         RegistrationCheckName,
+		Interval:     entity.KeepaliveTimeout,
+		Handlers:     []string{RegistrationHandlerName},
+		Environment:  entity.Environment,
+		Organization: entity.Organization,
+		Status:       1,
 	}
 	registrationEvent := &types.Event{
 		Timestamp: time.Now().Unix(),
@@ -321,7 +317,9 @@ func (k *Keepalived) HandleUpdate(e *types.Event) error {
 
 // HandleFailure checks if the entity should be deregistered, and emits a
 // keepalive event if the entity is still valid.
-func (k *Keepalived) HandleFailure(entity *types.Entity, event *types.Event) error {
+func (k *Keepalived) HandleFailure(entity *types.Entity, _ *types.Event) error {
+	// Note, we don't need to use the event parameter here as we're
+	// constructing new one instead.
 	ctx := types.SetContextFromResource(context.Background(), entity)
 
 	deregisterer := &Deregistration{
@@ -334,7 +332,7 @@ func (k *Keepalived) HandleFailure(entity *types.Entity, event *types.Event) err
 	}
 
 	// this is a real keepalive event, emit it.
-	event = createKeepaliveEvent(entity)
+	event := createKeepaliveEvent(entity)
 	event.Check.Status = 1
 	if err := k.MessageBus.Publish(messaging.TopicEventRaw, event); err != nil {
 		return err

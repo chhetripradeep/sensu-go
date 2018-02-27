@@ -69,6 +69,7 @@ func TestEventHandling(t *testing.T) {
 
 	// Make sure the event has been marked with the proper state
 	assert.Equal(t, types.EventPassingState, event.Check.State)
+	assert.Equal(t, event.Timestamp, event.Check.LastOK)
 }
 
 func TestEventMonitor(t *testing.T) {
@@ -94,7 +95,7 @@ func TestEventMonitor(t *testing.T) {
 	require.NoError(t, bus.Publish(messaging.TopicEventRaw, nil))
 
 	event := types.FixtureEvent("entity", "check")
-	event.Check.Config.Ttl = 90
+	event.Check.Ttl = 90
 
 	var nilEvent *types.Event
 	// no previous event.
